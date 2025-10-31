@@ -1,4 +1,4 @@
-# Shopify‑Style Portfolio
+# Portfolio Website
 A modern personal portfolio website inspired by Shopify’s clean design language. This project dynamically displays my pinned GitHub repositories with live data such as stars, description, language, and last update time. The layout is fully responsive, supports dark/light themes, and uses smooth hover animations for an elegant UX.
 
 
