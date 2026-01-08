@@ -160,102 +160,76 @@
   </footer>
 
   <script>
-    const GH_USER = 'jonb4323';
-    const grid = document.getElementById('grid');
-    const searchInput = document.getElementById('searchInput');
-    const sortSelect = document.getElementById('sortSelect');
-    const themeToggle = document.getElementById('themeToggle');
-
+    const GH_USER = "jonb4323";
+  
+    const grid = document.getElementById("grid");
+    const searchInput = document.getElementById("searchInput");
+    const sortSelect = document.getElementById("sortSelect");
+    const themeToggle = document.getElementById("themeToggle");
+  
+    // --- SETTINGS ---
+    const STARRED_LIMIT = 60; // change this if you want more/less starred repos shown
+    const CACHE_KEY = `starred_cache_${GH_USER}`;
+    const CACHE_TTL_MS = 1000 * 60 * 10; // 10 minutes fallback cache if rate limited
+  
     // Theme persistence
-    const getPrefTheme = () => localStorage.getItem('theme');
-    const setPrefTheme = (val) => localStorage.setItem('theme', val);
+    const getPrefTheme = () => localStorage.getItem("theme");
+    const setPrefTheme = (val) => localStorage.setItem("theme", val);
     const applyTheme = (val) => {
-      if (val === 'dark') document.documentElement.style.colorScheme = 'dark';
-      else if (val === 'light') document.documentElement.style.colorScheme = 'light';
-      else document.documentElement.style.colorScheme = 'light dark';
-      themeToggle.innerHTML = (document.documentElement.style.colorScheme.includes('dark')) ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+      if (val === "dark") document.documentElement.style.colorScheme = "dark";
+      else if (val === "light") document.documentElement.style.colorScheme = "light";
+      else document.documentElement.style.colorScheme = "light dark";
+      themeToggle.innerHTML = document.documentElement.style.colorScheme.includes("dark")
+        ? '<i class="fas fa-sun"></i>'
+        : '<i class="fas fa-moon"></i>';
     };
     applyTheme(getPrefTheme());
-    themeToggle.addEventListener('click', () => {
+    themeToggle.addEventListener("click", () => {
       const current = getPrefTheme();
-      const next = current === 'dark' ? 'light' : 'dark';
-      setPrefTheme(next); applyTheme(next);
+      const next = current === "dark" ? "light" : "dark";
+      setPrefTheme(next);
+      applyTheme(next);
     });
-
+  
     // Load GitHub avatar (always your current profile pic)
     async function loadGitHubAvatar() {
       try {
-        const res = await fetch(`https://api.github.com/users/${GH_USER}`);
-        if (!res.ok) throw new Error('GitHub user fetch failed');
+        const res = await fetch(`https://api.github.com/users/${GH_USER}`, {
+          cache: "no-store"
+        });
+        if (!res.ok) throw new Error("GitHub user fetch failed");
         const data = await res.json();
-        const avatar = document.getElementById('githubAvatar');
-        const sep = data.avatar_url.includes('?') ? '&' : '?';
+        const avatar = document.getElementById("githubAvatar");
         avatar.src = data.avatar_url;
-        avatar.alt = data.name || 'GitHub avatar';
+        avatar.alt = data.name || "GitHub avatar";
       } catch (e) {
-        document.getElementById('githubAvatar').src = 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png';
+        document.getElementById("githubAvatar").src =
+          "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png";
       }
     }
-
-    // Fetch only PINNED repositories
-    async function fetchRepos() {
-      // Manually pinned list provided by you
-      const PINNED = [
-        { name: 'CNN-Adversarial-MRI-Tumor-Classifier', fallbackDesc: 'CNN to classify brain MRI scans; evaluates robustness with adversarial attacks.' },
-        { name: 'BrainTumor-Detector', fallbackDesc: 'ML model on 3,700+ brain tumor images using simple algorithms; >88% accuracy.' },
-        { name: 'JonsAutoClicker', fallbackDesc: 'Auto clicker with clean functional GUI and many features.' },
-        { name: 'Website-Automation-Testing', fallbackDesc: 'Automated UI test suite for login using Selenium WebDriver and Pytest.' },
-        { name: 'Automotive-Data-Analysis', fallbackDesc: 'Excel-based EV sales dashboard with regional distribution and insights.' }
-      ];
-
-      const results = await Promise.all(PINNED.map(async (p) => {
-        try {
-          const rres = await fetch(`https://api.github.com/repos/${GH_USER}/${p.name}`, { headers: { 'Accept': 'application/vnd.github+json' } });
-          if (!rres.ok) throw new Error('Repo details failed');
-          const r = await rres.json();
-          return {
-            id: r.id,
-            name: r.name,
-            html_url: r.html_url,
-            homepage: r.homepage,
-            description: r.description || p.fallbackDesc || '',
-            language: r.language || '',
-            stargazers_count: r.stargazers_count || 0,
-            forks_count: r.forks_count || 0,
-            updated_at: r.updated_at || '',
-            pushed_at: r.pushed_at || '',
-            topics: r.topics || [],
-            default_branch: r.default_branch || 'main'
-          };
-        } catch (e) {
-          // Fallback if repo fetch fails (still render a card linking to expected URL)
-          return {
-            id: p.name,
-            name: p.name,
-            html_url: `https://github.com/${GH_USER}/${p.name}`,
-            homepage: `https://github.com/${GH_USER}/${p.name}`,
-            description: p.fallbackDesc || '',
-            language: '',
-            stargazers_count: 0,
-            forks_count: 0,
-            updated_at: '',
-            pushed_at: '',
-            topics: [],
-            default_branch: 'main'
-          };
-        }
-      }));
-
-      return results;
+  
+    // --- Utility ---
+    function clearGrid() {
+      grid.innerHTML = "";
     }
-
-    const state = { repos: [], filtered: [] };
-
+  
+    function renderSkeletons(count = 6) {
+      clearGrid();
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement("div");
+        el.className = "sk-card skeleton";
+        grid.appendChild(el);
+      }
+    }
+  
     function formatDate(iso) {
-      try { return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(iso)); }
-      catch { return iso; }
+      try {
+        return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(iso));
+      } catch {
+        return iso;
+      }
     }
-
+  
     function repoScore(r) {
       const stars = r.stargazers_count || 0;
       const freshDays = Math.max(1, (Date.now() - new Date(r.pushed_at).getTime()) / 86400000);
@@ -264,16 +238,16 @@
       const descBoost = r.description ? 5 : 0;
       return stars * 2 + recencyBoost + homepageBoost + descBoost;
     }
-
+  
     function sortRepos(list, mode) {
       const arr = [...list];
-      if (mode === 'stars') arr.sort((a,b) => (b.stargazers_count||0) - (a.stargazers_count||0));
-      else if (mode === 'updated') arr.sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at));
-      else if (mode === 'alpha') arr.sort((a,b) => a.name.localeCompare(b.name));
-      else arr.sort((a,b) => repoScore(b) - repoScore(a));
+      if (mode === "stars") arr.sort((a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0));
+      else if (mode === "updated") arr.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+      else if (mode === "alpha") arr.sort((a, b) => a.name.localeCompare(b.name));
+      else arr.sort((a, b) => repoScore(b) - repoScore(a));
       return arr;
     }
-
+  
     function matchesQuery(r, q) {
       if (!q) return true;
       q = q.toLowerCase();
@@ -281,39 +255,35 @@
         r.name.toLowerCase().includes(q) ||
         (r.description && r.description.toLowerCase().includes(q)) ||
         (r.language && r.language.toLowerCase().includes(q)) ||
-        (r.topics && r.topics.some(t => t.toLowerCase().includes(q)))
+        (r.topics && r.topics.some((t) => t.toLowerCase().includes(q)))
       );
     }
-
-    function clearGrid() { grid.innerHTML = ''; }
-
-    function renderSkeletons(count = 6) {
-      clearGrid();
-      for (let i=0; i<count; i++) {
-        const el = document.createElement('div');
-        el.className = 'sk-card skeleton';
-        grid.appendChild(el);
-      }
-    }
-
+  
+    // --- RENDER ---
     function render(list) {
       clearGrid();
+  
       if (!list.length) {
-        const empty = document.createElement('div');
-        empty.className = 'card';
-        empty.innerHTML = `<div class="body">
-          <div class="title" style="font-size:18px">No pinned repositories found</div>
-          <p class="desc">I’m set to show a manual list of repos. If nothing renders, double‑check the names or tell me new ones to include.</p>
-          <div class="actions">
-            <a class="link-btn" href="https://github.com/${GH_USER}?tab=repositories" target="_blank" rel="noreferrer"><i class="fab fa-github"></i> Open your repositories</a>
-          </div>`;
+        const empty = document.createElement("div");
+        empty.className = "card";
+        empty.innerHTML = `
+          <div class="body">
+            <div class="title" style="font-size:18px">No starred repositories found</div>
+            <p class="desc">Star repositories on GitHub and they will appear here automatically on refresh.</p>
+            <div class="actions">
+              <a class="link-btn" href="https://github.com/${GH_USER}?tab=stars" target="_blank" rel="noreferrer">
+                <i class="fab fa-github"></i> Open your starred repos
+              </a>
+            </div>
+          </div>
+        `;
         grid.appendChild(empty);
         return;
       }
-
+  
       for (const r of list) {
-        const card = document.createElement('article');
-        card.className = 'card';
+        const card = document.createElement("article");
+        card.className = "card";
         card.innerHTML = `
           <div class="thumb" aria-hidden="true"></div>
           <div class="body">
@@ -321,53 +291,158 @@
               <div class="title">${r.name}</div>
               <div title="Stars" aria-label="Stars"><i class="fa-regular fa-star"></i> ${r.stargazers_count || 0}</div>
             </div>
-            <p class="desc">${r.description ? r.description.replace(/</g,'&lt;') : 'No description yet.'}</p>
+            <p class="desc">${(r.description || "No description yet.").replace(/</g, "&lt;")}</p>
             <div class="tags">
-              ${r.language ? `<span class="tag">${r.language}</span>` : ''}
-              ${Array.isArray(r.topics) ? r.topics.slice(0,3).map(t => `<span class="tag">${t}</span>`).join('') : ''}
+              ${r.language ? `<span class="tag">${r.language}</span>` : ""}
+              ${Array.isArray(r.topics) ? r.topics.slice(0, 3).map((t) => `<span class="tag">${t}</span>`).join("") : ""}
             </div>
             <div class="meta-row">
               <span><i class="fa-regular fa-clock"></i> Updated ${formatDate(r.updated_at)}</span>
               <span><i class="fa-solid fa-code-branch"></i> ${r.default_branch}</span>
             </div>
             <div class="actions">
-              <a class="link-btn primary" href="${r.html_url}" target="_blank" rel="noreferrer"><i class="fab fa-github"></i> View Repo</a>
-              <a class="link-btn" href="${r.homepage || r.html_url}" target="_blank" rel="noreferrer"><i class="fa-solid fa-up-right-from-square"></i> ${r.homepage ? 'Live / Docs' : 'Open'}</a>
+              <a class="link-btn primary" href="${r.html_url}" target="_blank" rel="noreferrer">
+                <i class="fab fa-github"></i> View Repo
+              </a>
+              <a class="link-btn" href="${r.homepage || r.html_url}" target="_blank" rel="noreferrer">
+                <i class="fa-solid fa-up-right-from-square"></i> ${r.homepage ? "Live / Docs" : "Open"}
+              </a>
             </div>
           </div>
         `;
         grid.appendChild(card);
       }
     }
-
+  
+    // --- FETCH STARRED REPOS ---
+    async function fetchAllStarredRepos() {
+      let page = 1;
+      let repos = [];
+      const perPage = 100;
+  
+      // NOTE: GitHub API supports pagination
+      while (repos.length < STARRED_LIMIT) {
+        const url = `https://api.github.com/users/${GH_USER}/starred?per_page=${perPage}&page=${page}`;
+        const res = await fetch(url, {
+          headers: { Accept: "application/vnd.github+json" },
+          cache: "no-store"
+        });
+  
+        // If rate-limited, try cache
+        if (res.status === 403) {
+          const cached = loadCache();
+          if (cached) return cached;
+          throw new Error("GitHub API rate limit hit. Try again later.");
+        }
+  
+        if (!res.ok) throw new Error("Failed to fetch starred repositories");
+  
+        const data = await res.json();
+        if (!Array.isArray(data) || data.length === 0) break;
+  
+        repos = repos.concat(
+          data.map((r) => ({
+            id: r.id,
+            name: r.name,
+            full_name: r.full_name,
+            owner: r.owner?.login || "",
+            html_url: r.html_url,
+            homepage: r.homepage,
+            description: r.description || "",
+            language: r.language || "",
+            stargazers_count: r.stargazers_count || 0,
+            forks_count: r.forks_count || 0,
+            updated_at: r.updated_at || "",
+            pushed_at: r.pushed_at || "",
+            topics: r.topics || [],
+            default_branch: r.default_branch || "main"
+          }))
+        );
+  
+        page++;
+        if (data.length < perPage) break;
+      }
+  
+      repos = repos.slice(0, STARRED_LIMIT);
+      saveCache(repos);
+      return repos;
+    }
+  
+    // --- CACHE (fallback if rate limited) ---
+    function saveCache(repos) {
+      try {
+        localStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({
+            ts: Date.now(),
+            repos
+          })
+        );
+      } catch {}
+    }
+  
+    function loadCache() {
+      try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed?.ts || !Array.isArray(parsed?.repos)) return null;
+        if (Date.now() - parsed.ts > CACHE_TTL_MS) return null;
+        return parsed.repos;
+      } catch {
+        return null;
+      }
+    }
+  
+    // --- State ---
+    const state = { repos: [], filtered: [] };
+  
     function applyFilters() {
       const q = searchInput.value.trim();
       const mode = sortSelect.value;
-      const list = state.repos.filter(r => matchesQuery(r, q));
+  
+      const list = state.repos.filter((r) => matchesQuery(r, q));
       state.filtered = sortRepos(list, mode);
       render(state.filtered);
     }
-
-    function debounce(fn, ms=180){ let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), ms); }; }
-
+  
+    function debounce(fn, ms = 180) {
+      let t;
+      return (...args) => {
+        clearTimeout(t);
+        t = setTimeout(() => fn(...args), ms);
+      };
+    }
+  
+    // --- INIT ---
     async function init() {
       try {
         renderSkeletons();
         await loadGitHubAvatar();
-        state.repos = await fetchRepos();
+        state.repos = await fetchAllStarredRepos();
         applyFilters();
       } catch (err) {
         clearGrid();
-        const card = document.createElement('article');
-        card.className = 'card';
-        card.innerHTML = `<div class="body"><div class="title" style="font-size:18px">Could not load projects</div><p class="desc">${String(err).replace(/</g,'&lt;')}</p><div><a class="link-btn" href="https://github.com/${GH_USER}?tab=repositories" target="_blank" rel="noreferrer">Open GitHub Repositories</a></div></div>`;
+        const card = document.createElement("article");
+        card.className = "card";
+        card.innerHTML = `
+          <div class="body">
+            <div class="title" style="font-size:18px">Could not load starred projects</div>
+            <p class="desc">${String(err).replace(/</g, "&lt;")}</p>
+            <div class="actions">
+              <a class="link-btn" href="https://github.com/${GH_USER}?tab=stars" target="_blank" rel="noreferrer">
+                <i class="fab fa-github"></i> Open starred repos
+              </a>
+            </div>
+          </div>
+        `;
         grid.appendChild(card);
       }
     }
-
-    searchInput.addEventListener('input', debounce(applyFilters, 120));
-    sortSelect.addEventListener('change', applyFilters);
-
+  
+    searchInput.addEventListener("input", debounce(applyFilters, 120));
+    sortSelect.addEventListener("change", applyFilters);
+  
     init();
   </script>
 </body>
